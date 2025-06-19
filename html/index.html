@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="cs" class="h-full bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Správa Jednotek - UI</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome (pro ikony) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        /* Použití fontu Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Zabrání zobrazení scrollbarů kvůli pozadí */
+        }
+
+        /* Vlastní scrollbar pro lepší vzhled */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #11182780; /* gray-900 s průhledností */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; /* gray-600 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* gray-500 */
+        }
+
+        /* Moderní Aurora pozadí */
+        #aurora-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            filter: blur(100px);
+            opacity: 0.6;
+        }
+        .aurora-blob {
+            position: absolute;
+            border-radius: 50%;
+            mix-blend-mode: screen;
+        }
+        .blob-1 {
+            width: 400px;
+            height: 400px;
+            background: rgba(59, 130, 246, 0.4); /* blue-500 */
+            animation: move-blob-1 15s infinite alternate;
+        }
+        .blob-2 {
+            width: 300px;
+            height: 300px;
+            background: rgba(139, 92, 246, 0.4); /* violet-500 */
+            animation: move-blob-2 20s infinite alternate;
+        }
+         .blob-3 {
+            width: 350px;
+            height: 350px;
+            background: rgba(34, 211, 238, 0.4); /* cyan-400 */
+            animation: move-blob-3 18s infinite alternate;
+        }
+
+        @keyframes move-blob-1 {
+            from { transform: translate(10vw, 20vh) rotate(0deg); }
+            to { transform: translate(70vw, 60vh) rotate(360deg); }
+        }
+        @keyframes move-blob-2 {
+            from { transform: translate(80vw, 10vh) rotate(0deg); }
+            to { transform: translate(20vw, 80vh) rotate(-360deg); }
+        }
+        @keyframes move-blob-3 {
+            from { transform: translate(5vw, 70vh) rotate(0deg); }
+            to { transform: translate(60vw, 5vh) rotate(180deg); }
+        }
+
+
+        /* Notifikační toast (bez větších změn, stále efektivní) */
+        #notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            opacity: 0;
+            background: rgba(23, 31, 42, 0.8);
+            backdrop-filter: blur(5px);
+            transform: translateX(100%);
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .toast.success {
+            border-left: 5px solid #22c55e; /* green-500 */
+        }
+        .toast.error {
+            border-left: 5px solid #ef4444; /* red-500 */
+        }
+
+        /* Gradient podtržení pro titulky */
+        .gradient-underline {
+            border-image-slice: 1;
+            border-image-source: linear-gradient(to right, #3b82f6, #22d3ee);
+        }
+    </style>
+</head>
+<body class="h-full text-gray-200 p-4 sm:p-8 flex items-center justify-center">
+
+    <div id="aurora-background">
+        <div class="aurora-blob blob-1"></div>
+        <div class="aurora-blob blob-2"></div>
+        <div class="aurora-blob blob-3"></div>
+    </div>
+
+    <div id="unit-menu-container" class="w-full max-w-7xl h-[90vh] bg-gray-900/70 backdrop-blur-xl border border-gray-600/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        
+        <!-- Hlavička -->
+        <header class="flex items-center justify-between p-4 border-b border-gray-700/50 bg-gray-900/30">
+            <h1 class="text-2xl font-bold text-white tracking-wider"><i class="fas fa-siren-on mr-3 text-blue-400"></i>Správa Jednotek</h1>
+            <div id="player-status-container">
+                <!-- Status hráče se bude generovat zde -->
+            </div>
+        </header>
+
+        <!-- Hlavní obsah -->
+        <main id="main-content" class="flex-1 p-6 overflow-y-auto">
+            <!-- Kategorie a jednotky se budou generovat zde -->
+            <div id="loading-spinner" class="flex justify-center items-center h-full">
+                 <i class="fas fa-spinner fa-spin fa-3x text-blue-400"></i>
+            </div>
+        </main>
+        
+        <!-- Patička -->
+        <footer class="p-3 bg-gray-900/30 border-t border-gray-700/50 text-center text-xs text-gray-500">
+            Unit Management UI v2.0.0
+        </footer>
+    </div>
+    
+    <!-- Kontejner pro notifikace -->
+    <div id="notification-container"></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // =================================================================
+        // SIMULACE DAT - V REÁLNÉ APLIKACI BY TATO DATA PŘICHÁZELA Z LUA
+        // =================================================================
+
+        const Config = {
+            Categories: {
+                'Patrol': { label: 'Hlídkové Jednotky', icon: 'fas fa-car' },
+                'Support': { label: 'Podpůrné Jednotky', icon: 'fas fa-headset' },
+                'Special': { label: 'Speciální Jednotky', icon: 'fas fa-star' }
+            },
+            Units: {
+                'SOLO': { name: 'SOLO', label: 'Sólo Hlídka', description: 'Jednočlenná hlídka.', category: 'Patrol', icon: 'fas fa-user', maxPlayers: 1, minJobGrade: 0, allowedJobs: ['police', 'sheriff'] },
+                'ADAM': { name: 'ADAM', label: 'Adam', description: 'Standardní dvoučlenná hlídka.', category: 'Patrol', icon: 'fas fa-car-side', maxPlayers: 2, minJobGrade: 0, allowedJobs: ['police'] },
+                'UNION': { name: 'UNION', label: 'Union', description: 'Dvoučlenná hlídka Sheriffa.', category: 'Patrol', icon: 'fas fa-shield-alt', maxPlayers: 2, minJobGrade: 0, allowedJobs: ['sheriff'] },
+                'UNIT': { name: 'UNIT', label: 'Jednotka', description: 'Větší hlídková jednotka.', category: 'Patrol', icon: 'fas fa-users', maxPlayers: 4, minJobGrade: 2, allowedJobs: ['police', 'sheriff'] },
+                'DAVID': { name: 'DAVID', label: 'David', description: 'Dopravní jednotka.', category: 'Support', icon: 'fas fa-traffic-light', maxPlayers: 2, minJobGrade: 1, allowedJobs: ['police'] },
+                'MARY': { name: 'MARY', label: 'Mary', description: 'Jednotka pro dohled a podporu.', category: 'Support', icon: 'fas fa-binoculars', maxPlayers: 2, minJobGrade: 2, allowedJobs: ['police', 'sheriff'] },
+                'AIR': { name: 'AIR', label: 'Letecká Jednotka', description: 'Vzdušná podpora.', category: 'Special', icon: 'fas fa-helicopter', maxPlayers: 4, minJobGrade: 3, allowedJobs: ['police', 'sheriff'] },
+                'BOAT': { name: 'BOAT', label: 'Námořní Jednotka', description: 'Hlídka na vodě.', category: 'Special', icon: 'fas fa-ship', maxPlayers: 4, minJobGrade: 2, allowedJobs: ['police', 'sheriff'] }
+            }
+        };
+
+        let activeUnits = {
+            'ADAM-1234': {
+                id: 'ADAM-1234', name: 'ADAM', label: 'Adam', maxPlayers: 2, startTime: Math.floor(Date.now() / 1000) - 3600,
+                players: [ { source: 1, name: 'John Doe', job: 'police', job_grade: 2, job_label: 'Officer' } ]
+            },
+            'UNIT-5678': {
+                id: 'UNIT-5678', name: 'UNIT', label: 'Jednotka', maxPlayers: 4, startTime: Math.floor(Date.now() / 1000) - 120,
+                players: [
+                    { source: 3, name: 'Peter Jones', job: 'police', job_grade: 3, job_label: 'Sergeant' },
+                    { source: 4, name: 'Mary Jane', job: 'sheriff', job_grade: 2, job_label: 'Deputy Sheriff' }
+                ]
+            },
+            'AIR-9012': {
+                id: 'AIR-9012', name: 'AIR', label: 'Letecká Jednotka', maxPlayers: 4, startTime: Math.floor(Date.now() / 1000) - 18000,
+                players: [ { source: 5, name: 'Frank Castle', job: 'police', job_grade: 4, job_label: 'Lieutenant' } ]
+            }
+        };
+        let currentPlayer = {
+            source: 2, name: 'Jane Smith', job: { name: 'police', grade: 1 }, isInUnit: false, currentUnitId: null
+        };
+
+        // =================================================================
+        // FUNKCE PRO VYKRESLENÍ UI
+        // =================================================================
+
+        const mainContent = document.getElementById('main-content');
+        const playerStatusContainer = document.getElementById('player-status-container');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        function renderUI() {
+            loadingSpinner.style.display = 'none';
+            mainContent.innerHTML = '';
+            
+            const categorizedUnits = {};
+            for (const catKey in Config.Categories) {
+                categorizedUnits[catKey] = { ...Config.Categories[catKey], units: [] };
+            }
+            for (const unitKey in Config.Units) {
+                const unitDef = Config.Units[unitKey];
+                if (categorizedUnits[unitDef.category]) {
+                    categorizedUnits[unitDef.category].units.push(unitDef);
+                }
+            }
+
+            for (const catKey in categorizedUnits) {
+                const category = categorizedUnits[catKey];
+                if (category.units.length === 0) continue;
+
+                let categoryHtml = `
+                    <div class="mb-8">
+                        <h2 class="text-xl font-semibold mb-4 border-b-2 gradient-underline pb-2">
+                            <i class="${category.icon} mr-2 text-cyan-300"></i>${category.label}
+                        </h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                `;
+                category.units.forEach(unitDef => { categoryHtml += renderUnitCard(unitDef); });
+                categoryHtml += `</div></div>`;
+                mainContent.innerHTML += categoryHtml;
+            }
+
+            renderPlayerStatus();
+            addEventListeners();
+        }
+
+        function renderUnitCard(unitDef) {
+            const instances = Object.values(activeUnits).filter(u => u.name === unitDef.name);
+            let cardHtml = '';
+
+            if (instances.length === 0) {
+                 cardHtml += createInstanceCard(unitDef, 'create');
+            } else {
+                instances.forEach(instance => { cardHtml += createInstanceCard(unitDef, 'join', instance); });
+                const hasFreeSlot = instances.some(inst => inst.players.length < inst.maxPlayers);
+                if (!hasFreeSlot && unitDef.maxPlayers > 0) {
+                   cardHtml += createInstanceCard(unitDef, 'create');
+                }
+            }
+            return cardHtml;
+        }
+        
+        function createInstanceCard(unitDef, type, instance = null) {
+            const isFull = instance ? instance.players.length >= instance.maxPlayers : false;
+            const canJoinJob = unitDef.allowedJobs.includes(currentPlayer.job.name);
+            const canJoinGrade = currentPlayer.job.grade >= unitDef.minJobGrade;
+            const canJoin = !currentPlayer.isInUnit && canJoinJob && canJoinGrade;
+
+            let statusColor, statusText;
+            if (type === 'create') {
+                statusColor = 'bg-green-500/20 text-green-300'; statusText = 'VOLNO';
+            } else if (isFull) {
+                statusColor = 'bg-red-500/20 text-red-300'; statusText = 'PLNO';
+            } else {
+                statusColor = 'bg-yellow-500/20 text-yellow-300'; statusText = `${instance.players.length}/${instance.maxPlayers}`;
+            }
+
+            let buttonHtml = '';
+            let reason = '';
+            if (type === 'create') {
+                if(canJoin) {
+                    buttonHtml = `<button data-action="create" data-unit-name="${unitDef.name}" class="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-cyan-500/50">Vytvořit</button>`;
+                } else {
+                    reason = !canJoinJob ? "Špatná profese" : !canJoinGrade ? "Nízká hodnost" : "Jste v jednotce";
+                    buttonHtml = `<button disabled class="w-full bg-gray-700/50 text-gray-400 font-bold py-2 px-4 rounded-lg cursor-not-allowed">${reason}</button>`;
+                }
+            } else if (instance) {
+                if (canJoin && !isFull) {
+                     buttonHtml = `<button data-action="join" data-unit-id="${instance.id}" class="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-emerald-500/50">Připojit se</button>`;
+                } else {
+                    reason = isFull ? "Plno" : "Nelze se připojit";
+                    if (currentPlayer.isInUnit) reason = "Jste v jednotce";
+                    buttonHtml = `<button disabled class="w-full bg-gray-700/50 text-gray-400 font-bold py-2 px-4 rounded-lg cursor-not-allowed">${reason}</button>`;
+                }
+            }
+            
+            let playersHtml = '<p class="text-xs text-gray-400 italic">Žádní hráči v jednotce.</p>';
+            if (instance && instance.players.length > 0) {
+                 playersHtml = instance.players.map(p => `
+                    <div class="flex items-center justify-between text-sm py-1">
+                        <span><i class="fas fa-user-shield mr-2 text-gray-500"></i>${p.name}</span>
+                        <span class="font-mono text-xs text-cyan-300">${p.job_label} (${p.job_grade})</span>
+                    </div>
+                 `).join('');
+            }
+            
+            let activeSinceHtml = '';
+            if (instance) {
+                activeSinceHtml = `<p class="text-xs text-gray-400" data-start-time="${instance.startTime}">Aktivní: ${formatDuration(Date.now()/1000 - instance.startTime)}</p>`;
+            }
+
+            return `
+                <div class="bg-gray-900/60 backdrop-blur-sm border border-gray-700/50 rounded-lg p-4 flex flex-col justify-between transition-all duration-300 transform hover:scale-105 hover:border-cyan-400/70 hover:shadow-2xl hover:shadow-cyan-500/20">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center">
+                                <i class="${unitDef.icon} fa-lg mr-3 text-gray-300"></i>
+                                <div>
+                                    <h3 class="font-bold text-white">${unitDef.label} ${instance ? `(${instance.id.split('-')[1]})` : ''}</h3>
+                                    <p class="text-xs text-gray-400">${unitDef.description}</p>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold px-2 py-1 rounded-md ${statusColor}">${statusText}</span>
+                        </div>
+                         <div class="text-right mb-3">${activeSinceHtml}</div>
+                        <div class="bg-black/20 p-3 rounded-md mb-4 border border-white/5">
+                            <h4 class="text-sm font-semibold mb-2 text-gray-300">Hráči v jednotce:</h4>
+                            <div class="space-y-1">${playersHtml}</div>
+                        </div>
+                    </div>
+                    ${buttonHtml}
+                </div>
+            `;
+        }
+        
+        function renderPlayerStatus() {
+            if (currentPlayer.isInUnit && activeUnits[currentPlayer.currentUnitId]) {
+                const unit = activeUnits[currentPlayer.currentUnitId];
+                const unitDef = Config.Units[unit.name];
+                playerStatusContainer.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="text-right">
+                            <p class="text-sm font-semibold text-white">V jednotce: <span class="text-cyan-300 font-bold">${unitDef.label}</span></p>
+                            <p class="text-xs text-gray-400" data-start-time="${unit.startTime}">Aktivní: ${formatDuration(Date.now()/1000 - unit.startTime)}</p>
+                        </div>
+                        <button id="leave-unit-btn" class="bg-gradient-to-r from-red-600 to-rose-500 hover:from-red-700 hover:to-rose-600 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-rose-500/50">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Opustit
+                        </button>
+                    </div>
+                `;
+                 document.getElementById('leave-unit-btn').addEventListener('click', handleLeaveUnit);
+            } else {
+                playerStatusContainer.innerHTML = `<p class="text-sm text-gray-400">Nejste v žádné jednotce.</p>`;
+            }
+        }
+
+        // =================================================================
+        // OBSLUHA UDÁLOSTÍ (EVENT HANDLERY)
+        // =================================================================
+        
+        function addEventListeners() {
+            document.querySelectorAll('[data-action="create"]').forEach(button => {
+                button.addEventListener('click', (e) => handleCreateUnit(e.currentTarget.dataset.unitName));
+            });
+            document.querySelectorAll('[data-action="join"]').forEach(button => {
+                button.addEventListener('click', (e) => handleJoinUnit(e.currentTarget.dataset.unitId));
+            });
+        }
+        
+        function handleCreateUnit(unitName) {
+            const unitDef = Config.Units[unitName];
+            if (currentPlayer.isInUnit) { showNotification('Již jste v jednotce.', 'error'); return; }
+            if (!unitDef.allowedJobs.includes(currentPlayer.job.name) || currentPlayer.job.grade < unitDef.minJobGrade) { showNotification('Nemáte oprávnění.', 'error'); return; }
+
+            const newUnitId = `${unitName}-${Math.floor(1000 + Math.random() * 9000)}`;
+            activeUnits[newUnitId] = {
+                id: newUnitId, name: unitName, label: unitDef.label, maxPlayers: unitDef.maxPlayers, startTime: Math.floor(Date.now() / 1000),
+                players: [{ ...currentPlayer, job: currentPlayer.job.name, job_grade: currentPlayer.job.grade, job_label: 'Officer' }]
+            };
+            currentPlayer.isInUnit = true;
+            currentPlayer.currentUnitId = newUnitId;
+            showNotification(`Úspěšně jste vytvořili jednotku ${unitDef.label}.`, 'success');
+            renderUI();
+        }
+
+        function handleJoinUnit(unitId) {
+            const unit = activeUnits[unitId];
+            if (!unit) return;
+            const unitDef = Config.Units[unit.name];
+            if (currentPlayer.isInUnit) { showNotification('Již jste v jednotce.', 'error'); return; }
+            if (unit.players.length >= unit.maxPlayers) { showNotification('Jednotka je plná.', 'error'); return; }
+            if (!unitDef.allowedJobs.includes(currentPlayer.job.name) || currentPlayer.job.grade < unitDef.minJobGrade) { showNotification('Nemáte oprávnění.', 'error'); return; }
+            
+            unit.players.push({ ...currentPlayer, job: currentPlayer.job.name, job_grade: currentPlayer.job.grade, job_label: 'Officer' });
+            currentPlayer.isInUnit = true;
+            currentPlayer.currentUnitId = unitId;
+            showNotification(`Úspěšně jste se připojili k jednotce ${unitDef.label}.`, 'success');
+            renderUI();
+        }
+
+        function handleLeaveUnit() {
+            if (!currentPlayer.isInUnit || !activeUnits[currentPlayer.currentUnitId]) { showNotification('Nejste v žádné jednotce.', 'error'); return; }
+            
+            const unit = activeUnits[currentPlayer.currentUnitId];
+            unit.players = unit.players.filter(p => p.source !== currentPlayer.source);
+
+            if (unit.players.length === 0) { delete activeUnits[currentPlayer.currentUnitId]; }
+            currentPlayer.isInUnit = false;
+            currentPlayer.currentUnitId = null;
+            showNotification('Úspěšně jste opustili jednotku.', 'success');
+            renderUI();
+        }
+
+        // =================================================================
+        // POMOCNÉ FUNKCE
+        // =================================================================
+
+        function formatDuration(totalSeconds) {
+            if (isNaN(totalSeconds) || totalSeconds < 0) return "0h 0m 0s";
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+            return `${hours}h ${minutes}m ${seconds}s`;
+        }
+        
+        function showNotification(message, type = 'success') {
+            const container = document.getElementById('notification-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.add('show'); }, 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => toast.remove());
+            }, 4000);
+        }
+
+        setInterval(() => {
+            document.querySelectorAll('[data-start-time]').forEach(elem => {
+                const startTime = parseInt(elem.dataset.startTime, 10);
+                const durationText = formatDuration(Math.floor(Date.now() / 1000) - startTime);
+                const prefix = elem.textContent.split(':')[0];
+                elem.textContent = `${prefix}: ${durationText}`;
+            });
+        }, 1000);
+
+        setTimeout(() => { renderUI(); }, 500);
+    });
+    </script>
+</body>
+</html>
